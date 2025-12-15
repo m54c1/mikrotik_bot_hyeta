@@ -8,17 +8,17 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 
 logging.basicConfig(level=logging.INFO)
 
-BOT_TOKEN = os.environ["BOT_TOKEN"]
-ALLOWED_CHAT_ID = int(os.environ["ALLOWED_CHAT_ID"])
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+ALLOWED_CHAT_ID = int(os.getenv("ALLOWED_CHAT_ID"))
 
-MT_HOST = os.environ["MT_HOST"]
-MT_PORT = int(os.environ.get("MT_PORT", "8728"))  # 8728 API, 8729 API-SSL [web:41]
-MT_USER = os.environ["MT_USER"]
-MT_PASS = os.environ["MT_PASS"]
+MT_HOST = os.getenv("MT_HOST")
+MT_PORT = int(os.getenv("MT_PORT", "8728"))  # 8728 API, 8729 API-SSL [web:41]
+MT_USER = os.getenv("MT_USER")
+MT_PASS = os.getenv("MT_PASS")
 
-SCRIPT_ON = os.environ.get("SCRIPT_ON", "inet_on_250")
-SCRIPT_OFF = os.environ.get("SCRIPT_OFF", "inet_off_250")
-SCRIPT_STATUS = os.environ.get("SCRIPT_STATUS", "inet_status_250")
+SCRIPT_ON = os.getenv("SCRIPT_ON", "inet_on_250")
+SCRIPT_OFF = os.getenv("SCRIPT_OFF", "inet_off_250")
+SCRIPT_STATUS = os.getenv("SCRIPT_STATUS", "inet_status_250")
 
 
 def _ros_run_script(script_name: str) -> str:
@@ -31,8 +31,11 @@ def _ros_run_script(script_name: str) -> str:
         plaintext_login=True,
     )
     api = api_pool.get_api()
-    scripts = api.get_resource("/system/script")
-    scripts.call("run", {"name": script_name})
+
+    # запускаем /system/script/run number=<имя_скрипта>
+    run_res = api.get_resource("/system/script/run")
+    run_res.add(number=script_name)
+
     api_pool.disconnect()
     return script_name
 
