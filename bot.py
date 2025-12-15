@@ -4,12 +4,7 @@ import logging
 
 from routeros_api import RouterOsApiPool
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    CallbackQueryHandler,
-    ContextTypes,
-)
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 logging.basicConfig(level=logging.INFO)
 
@@ -28,7 +23,7 @@ SCRIPT_STATUS = os.environ.get("SCRIPT_STATUS", "inet_status_250")
 ALISA_NAME = os.environ.get("ALISA_NAME", "алиса")
 
 
-def _ros_run_script(script_name: str) -> str:
+def _ros_run_script_ret(script_name: str) -> str:
     api_pool = RouterOsApiPool(
         MT_HOST,
         username=MT_USER,
@@ -39,14 +34,17 @@ def _ros_run_script(script_name: str) -> str:
     )
     api = api_pool.get_api()
 
-    scripts = api.get_resource("/system/script")
-    response = scripts.call("run", {"number": script_name})
+    # ВАЖНО: binary_resource + system/script/run, чтобы получить done_message['ret'] [web:103][web:59]
+    resp = api.get_binary_resource("/").call(
+        "system/script/run",
+        {"number": script_name.encode("utf-8")},
+    )
 
     api_pool.disconnect()
 
     ret = ""
-    if hasattr(response, "done_message") and isinstance(response.done_message, dict):
-        ret = response.done_message.get("ret", "")
+    if hasattr(resp, "done_message") and isinstance(resp.done_message, dict):
+        ret = resp.done_message.get("ret", b"")
 
     if isinstance(ret, (bytes, bytearray)):
         ret = ret.decode("utf-8", errors="ignore")
@@ -54,8 +52,8 @@ def _ros_run_script(script_name: str) -> str:
     return (ret or "").strip()
 
 
-async def ros_run_script(script_name: str) -> str:
-    return await asyncio.to_thread(_ros_run_script, script_name)
+async def ros_run_script_ret(script_name: str) -> str:
+    return await asyncio.to_thread(_ros_run_script_ret, script_name)
 
 
 def status_to_text(raw: str) -> str:
@@ -68,15 +66,13 @@ def status_to_text(raw: str) -> str:
 
 
 def kb() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("Статус", callback_data="status")],
         [
-            [InlineKeyboardButton("Статус", callback_data="status")],
-            [
-                InlineKeyboardButton("ВКЛ интернет", callback_data="on"),
-                InlineKeyboardButton("ВЫКЛ интернет", callback_data="off"),
-            ],
-        ]
-    )
+            InlineKeyboardButton("ВКЛ интернет", callback_data="on"),
+            InlineKeyboardButton("ВЫКЛ интернет", callback_data="off"),
+        ],
+    ])
 
 
 def allowed(update: Update) -> bool:
@@ -99,17 +95,17 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     try:
         if q.data == "on":
-            await ros_run_script(SCRIPT_ON)
-            raw = await ros_run_script(SCRIPT_STATUS)
+            await ros_run_script_ret(SCRIPT_ON)
+            raw = await ros_run_script_ret(SCRIPT_STATUS)
             await q.message.reply_text(status_to_text(raw), reply_markup=kb())
 
         elif q.data == "off":
-            await ros_run_script(SCRIPT_OFF)
-            raw = await ros_run_script(SCRIPT_STATUS)
+            await ros_run_script_ret(SCRIPT_OFF)
+            raw = await ros_run_script_ret(SCRIPT_STATUS)
             await q.message.reply_text(status_to_text(raw), reply_markup=kb())
 
         elif q.data == "status":
-            raw = await ros_run_script(SCRIPT_STATUS)
+            raw = await ros_run_script_ret(SCRIPT_STATUS)
             await q.message.reply_text(status_to_text(raw), reply_markup=kb())
 
         else:
