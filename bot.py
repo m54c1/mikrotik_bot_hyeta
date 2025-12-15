@@ -32,8 +32,8 @@ def _ros_run_script(script_name: str) -> str:
     )
     api = api_pool.get_api()
 
-    # ключевой вызов
-    api.call('/system/script/run', {'number': script_name})
+    run_res = api.get_resource('/system/script/run')
+    run_res.call('run', {'number': script_name})
 
     api_pool.disconnect()
     return script_name
