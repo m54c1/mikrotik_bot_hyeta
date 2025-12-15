@@ -6,10 +6,11 @@
 потом нового юзера создаёте в данной группе, в ip/services дайте доступ к api с айпи тачки, на которой будет эта хуйня крутится в докере, либо api-ssl, если тачка будет не в локалке.
 
 скрипты для самого микротика
-/system script
-add name=inet_off_250 policy=read,write,test source={
-    :local ip "10.254.0.250"
 
+    /system script
+    add name=inet_off_250 policy=read,write,test source={
+    :local ip "10.254.0.250"
+    
     /ip firewall nat set numbers=2 disabled=no
 
     /ip firewall connection remove [find \
@@ -19,9 +20,10 @@ add name=inet_off_250 policy=read,write,test source={
         or reply-dst-address=$ip \
     ]
     }
-/system script
-add name=inet_on_250 policy=read,write,test source={
+
+    /system script
+    add name=inet_on_250 policy=read,write,test source={
     /ip firewall nat set numbers=2 disabled=yes
-}
+    }
 
 бля нахуя я вообще всё это пишу. надеюсь, что этот репозиторий никто не увидит и мне не будет стыдно за оформление и нецензурную лексику
