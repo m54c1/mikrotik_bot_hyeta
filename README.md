@@ -18,7 +18,7 @@ add name=inet_off_250 policy=read,write,test source={
         or reply-src-address=$ip \
         or reply-dst-address=$ip \
     ]
-}
+    }
 /system script
 add name=inet_on_250 policy=read,write,test source={
     /ip firewall nat set numbers=2 disabled=yes
