@@ -12,7 +12,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ALLOWED_CHAT_ID = int(os.getenv("ALLOWED_CHAT_ID"))
 
 MT_HOST = os.getenv("MT_HOST")
-MT_PORT = int(os.getenv("MT_PORT", "8728"))  # 8728 API, 8729 API-SSL [web:41]
+MT_PORT = int(os.getenv("MT_PORT", "8728"))
 MT_USER = os.getenv("MT_USER")
 MT_PASS = os.getenv("MT_PASS")
 
@@ -32,9 +32,8 @@ def _ros_run_script(script_name: str) -> str:
     )
     api = api_pool.get_api()
 
-    # запускаем /system/script/run number=<имя_скрипта>
-    run_res = api.get_resource("/system/script/run")
-    run_res.add(number=script_name)
+    # ключевой вызов
+    api.call('/system/script/run', {'number': script_name})
 
     api_pool.disconnect()
     return script_name
