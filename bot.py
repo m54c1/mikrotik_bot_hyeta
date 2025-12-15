@@ -16,10 +16,13 @@ MT_PORT = int(os.environ.get("MT_PORT", "8728"))
 MT_USER = os.environ["MT_USER"]
 MT_PASS = os.environ["MT_PASS"]
 
+# Скрипты на MikroTik (они включают/выключают CUT и чистят conntrack)
 SCRIPT_ON = os.environ.get("SCRIPT_ON", "inet_on_250")
 SCRIPT_OFF = os.environ.get("SCRIPT_OFF", "inet_off_250")
 
-CUT_NAT_NUM = int(os.environ.get("CUT_NAT_NUM", "2"))  # твой numbers=2
+# "номер" правила в NAT: 2 == третий (если считать с 0)
+CUT_NAT_INDEX = int(os.environ.get("CUT_NAT_INDEX", "2"))
+
 ALISA_NAME = os.environ.get("ALISA_NAME", "алиса")
 
 
@@ -39,31 +42,36 @@ def _ros_run_script(script_name: str) -> None:
     pool, api = _ros_connect()
     try:
         scripts = api.get_resource("/system/script")
-        # у тебя работает именно number=..., не name [web:76]
+        # у тебя работает запуск через number=имя_скрипта
         scripts.call("run", {"number": script_name})
     finally:
         pool.disconnect()
 
 
-def _ros_get_inet_allowed() -> bool:
+def _ros_get_inet_allowed_by_nat_index() -> bool:
     """
-    True  -> интернет разрешён (CUT правило выключено, disabled=yes)
-    False -> интернет запрещён  (CUT правило включено, disabled=no)
+    True  -> алиса подключена к интернету
+    False -> алиса не подключена к интернету
+
+    Логика:
+    - CUT правило (action=accept в srcnat) когда ВКЛЮЧЕНО (disabled=no) => интернет РЕЖЕТСЯ
+    - когда ВЫКЛЮЧЕНО (disabled=yes) => интернет ЕСТЬ
     """
     pool, api = _ros_connect()
     try:
         nat = api.get_resource("/ip/firewall/nat")
+        rules = nat.get()  # список правил NAT [web:61]
 
-        # Пытаемся точечно взять правило по numbers через print [web:76]
-        rows = nat.call("print", {"numbers": str(CUT_NAT_NUM)})
-        if not rows:
-            raise RuntimeError(f"NAT rule numbers={CUT_NAT_NUM} not found")
+        if CUT_NAT_INDEX < 0 or CUT_NAT_INDEX >= len(rules):
+            raise RuntimeError(
+                f"NAT rules count={len(rules)}, index={CUT_NAT_INDEX} out of range"
+            )
 
-        disabled_val = str(rows[0].get("disabled", "")).lower().strip()
+        rule = rules[CUT_NAT_INDEX]
+        disabled_val = str(rule.get("disabled", "")).lower().strip()
+
         cut_rule_disabled = disabled_val in ("yes", "true")
-
-        # Если CUT disabled=yes -> интернет есть
-        return cut_rule_disabled
+        return cut_rule_disabled  # True => интернет есть
     finally:
         pool.disconnect()
 
@@ -73,7 +81,7 @@ async def ros_run_script(script_name: str) -> None:
 
 
 async def ros_get_status_text() -> str:
-    inet_allowed = await asyncio.to_thread(_ros_get_inet_allowed)
+    inet_allowed = await asyncio.to_thread(_ros_get_inet_allowed_by_nat_index)
     if inet_allowed:
         return f"{ALISA_NAME} подключена к интернету"
     return f"{ALISA_NAME} не подключена к интернету"
@@ -127,10 +135,15 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await q.message.reply_text(f"Ошибка: {type(e).__name__}: {e}", reply_markup=kb())
 
 
+async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logging.exception("Unhandled error", exc_info=context.error)
+
+
 def main() -> None:
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(on_button))
+    app.add_error_handler(on_error)
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
