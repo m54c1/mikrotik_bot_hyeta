@@ -9,11 +9,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 logging.basicConfig(level=logging.INFO)
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
-ALLOWED_CHAT_IDS = {
-    int(x.strip())
-    for x in os.environ["ALLOWED_CHAT_ID"].split(",")
-    if x.strip()
-}
+ALLOWED_CHAT_ID = int(os.environ["ALLOWED_CHAT_ID"])
 
 MT_HOST = os.environ["MT_HOST"]
 MT_PORT = int(os.environ.get("MT_PORT", "8728"))
@@ -103,7 +99,7 @@ def kb() -> InlineKeyboardMarkup:
 
 def allowed(update: Update) -> bool:
     chat = update.effective_chat
-    return chat is not None and chat.id in ALLOWED_CHAT_IDS
+    return chat is not None and chat.id == ALLOWED_CHAT_ID
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
