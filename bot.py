@@ -9,7 +9,16 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 logging.basicConfig(level=logging.INFO)
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
-ALLOWED_CHAT_ID = int(os.environ["ALLOWED_CHAT_ID"])
+
+_raw_ids = os.environ.get("ALLOWED_CHAT_ID", "")
+ALLOWED_CHAT_IDS = {
+    int(x.strip())
+    for x in _raw_ids.split(",")
+    if x.strip()
+}
+
+if not ALLOWED_CHAT_IDS:
+    raise RuntimeError("ALLOWED_CHAT_ID is empty. Set: ALLOWED_CHAT_ID=id1,id2,...")
 
 MT_HOST = os.environ["MT_HOST"]
 MT_PORT = int(os.environ.get("MT_PORT", "8728"))
@@ -42,7 +51,7 @@ def _ros_run_script(script_name: str) -> None:
     pool, api = _ros_connect()
     try:
         scripts = api.get_resource("/system/script")
-        # у тебя работает запуск через number=имя_скрипта
+        # запуск через number=имя_скрипта
         scripts.call("run", {"number": script_name})
     finally:
         pool.disconnect()
@@ -60,7 +69,7 @@ def _ros_get_inet_allowed_by_nat_index() -> bool:
     pool, api = _ros_connect()
     try:
         nat = api.get_resource("/ip/firewall/nat")
-        rules = nat.get()  # список правил NAT [web:61]
+        rules = nat.get()
 
         if CUT_NAT_INDEX < 0 or CUT_NAT_INDEX >= len(rules):
             raise RuntimeError(
@@ -97,9 +106,13 @@ def kb() -> InlineKeyboardMarkup:
     ])
 
 
+def _allowed_chat_id(chat_id) -> bool:
+    return chat_id is not None and int(chat_id) in ALLOWED_CHAT_IDS
+
+
 def allowed(update: Update) -> bool:
     chat = update.effective_chat
-    return chat is not None and chat.id == ALLOWED_CHAT_ID
+    return chat is not None and chat.id in ALLOWED_CHAT_IDS  # id это int [web:528]
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -112,7 +125,7 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
 
-    if q.message is None or q.message.chat_id != ALLOWED_CHAT_ID:
+    if q.message is None or not _allowed_chat_id(q.message.chat_id):
         return
 
     try:
