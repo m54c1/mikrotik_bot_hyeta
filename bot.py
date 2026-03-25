@@ -107,6 +107,7 @@ def allowed(update: Update) -> bool:
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logging.info("Incoming chat_id: %s, allowed: %s", update.effective_chat.id, allowed(update))
     if not allowed(update):
         return
     await update.message.reply_text("Панель:", reply_markup=kb())
@@ -146,6 +147,7 @@ async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
 def main() -> None:
     logging.info("PROXY value: '%s'", PROXY)
     logging.info("socksio installed: %s", importlib.util.find_spec("socksio") is not None)
+    logging.info("ALLOWED_CHAT_IDS: %s", ALLOWED_CHAT_IDS)
 
     builder = Application.builder().token(BOT_TOKEN)
 
