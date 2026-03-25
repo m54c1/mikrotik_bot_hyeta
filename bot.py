@@ -153,8 +153,9 @@ def main() -> None:
 
     if PROXY:
         logging.info("Using proxy: %s", PROXY)
-        request = HTTPXRequest(proxy=PROXY)
-        builder = builder.request(request)
+        builder = builder \
+            .request(HTTPXRequest(proxy=PROXY)) \
+            .get_updates_request(HTTPXRequest(proxy=PROXY))
 
     app = builder.build()
     app.add_handler(CommandHandler("start", start))
