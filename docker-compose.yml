@@ -13,7 +13,9 @@ services:
       MT_PORT: "${MT_PORT:-8728}"          # API 8728, API-SSL 8729 [web:41]
       MT_USER: "${MT_USER:?set MT_USER}"
       MT_PASS: "${MT_PASS:?set MT_PASS}"
+      PROXY: "${PROXY:?set PROXY}"
 
       SCRIPT_ON: "${SCRIPT_ON:-inet_on_250}"
       SCRIPT_OFF: "${SCRIPT_OFF:-inet_off_250}"
       SCRIPT_STATUS: "${SCRIPT_STATUS:-inet_status_250}"
+      
