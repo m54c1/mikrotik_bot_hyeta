@@ -1,6 +1,7 @@
 import os
 import asyncio
 import logging
+import importlib.util
 
 from routeros_api import RouterOsApiPool
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -33,9 +34,6 @@ CUT_NAT_INDEX = int(os.environ.get("CUT_NAT_INDEX", "2"))
 
 ALISA_NAME = os.environ.get("ALISA_NAME", "алиса")
 
-# Прокси — опционально. Примеры:
-#   PROXY=socks5://user:pass@host:1080
-#   PROXY=http://host:3128
 PROXY = os.environ.get("PROXY", "")
 
 
@@ -146,6 +144,9 @@ async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 def main() -> None:
+    logging.info("PROXY value: '%s'", PROXY)
+    logging.info("socksio installed: %s", importlib.util.find_spec("socksio") is not None)
+
     builder = Application.builder().token(BOT_TOKEN)
 
     if PROXY:
