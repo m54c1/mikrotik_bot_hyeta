@@ -5,6 +5,7 @@ import logging
 from routeros_api import RouterOsApiPool
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.request import HTTPXRequest
 
 logging.basicConfig(level=logging.INFO)
 
@@ -25,14 +26,17 @@ MT_PORT = int(os.environ.get("MT_PORT", "8728"))
 MT_USER = os.environ["MT_USER"]
 MT_PASS = os.environ["MT_PASS"]
 
-# Скрипты на MikroTik (они включают/выключают CUT и чистят conntrack)
 SCRIPT_ON = os.environ.get("SCRIPT_ON", "inet_on_250")
 SCRIPT_OFF = os.environ.get("SCRIPT_OFF", "inet_off_250")
 
-# "номер" правила в NAT: 2 == третий (если считать с 0)
 CUT_NAT_INDEX = int(os.environ.get("CUT_NAT_INDEX", "2"))
 
 ALISA_NAME = os.environ.get("ALISA_NAME", "алиса")
+
+# Прокси — опционально. Примеры:
+#   PROXY=socks5://user:pass@host:1080
+#   PROXY=http://host:3128
+PROXY = os.environ.get("PROXY", "")
 
 
 def _ros_connect():
@@ -51,21 +55,12 @@ def _ros_run_script(script_name: str) -> None:
     pool, api = _ros_connect()
     try:
         scripts = api.get_resource("/system/script")
-        # запуск через number=имя_скрипта
         scripts.call("run", {"number": script_name})
     finally:
         pool.disconnect()
 
 
 def _ros_get_inet_allowed_by_nat_index() -> bool:
-    """
-    True  -> алиса подключена к интернету
-    False -> алиса не подключена к интернету
-
-    Логика:
-    - CUT правило (action=accept в srcnat) когда ВКЛЮЧЕНО (disabled=no) => интернет РЕЖЕТСЯ
-    - когда ВЫКЛЮЧЕНО (disabled=yes) => интернет ЕСТЬ
-    """
     pool, api = _ros_connect()
     try:
         nat = api.get_resource("/ip/firewall/nat")
@@ -78,9 +73,7 @@ def _ros_get_inet_allowed_by_nat_index() -> bool:
 
         rule = rules[CUT_NAT_INDEX]
         disabled_val = str(rule.get("disabled", "")).lower().strip()
-
-        cut_rule_disabled = disabled_val in ("yes", "true")
-        return cut_rule_disabled  # True => интернет есть
+        return disabled_val in ("yes", "true")
     finally:
         pool.disconnect()
 
@@ -112,7 +105,7 @@ def _allowed_chat_id(chat_id) -> bool:
 
 def allowed(update: Update) -> bool:
     chat = update.effective_chat
-    return chat is not None and chat.id in ALLOWED_CHAT_IDS  # id это int [web:528]
+    return chat is not None and chat.id in ALLOWED_CHAT_IDS
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -153,7 +146,14 @@ async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 def main() -> None:
-    app = Application.builder().token(BOT_TOKEN).build()
+    builder = Application.builder().token(BOT_TOKEN)
+
+    if PROXY:
+        logging.info("Using proxy: %s", PROXY)
+        request = HTTPXRequest(proxy=PROXY)
+        builder = builder.request(request)
+
+    app = builder.build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(on_button))
     app.add_error_handler(on_error)
@@ -162,4 +162,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
